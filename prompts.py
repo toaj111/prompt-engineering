@@ -54,7 +54,7 @@ REFLEXION_ACTOR_PROMPT = """
 Below are several training examples of a grid transformation task.
 
 Each example consists of an input grid and its corresponding output grid.
-The grids are 2D arrays of integers.
+The grids are 2D arrays of integers, where each integer represents a color.
 
 Training Examples:
 
@@ -63,10 +63,13 @@ Training Examples:
 Your task is to infer the transformation rule from the training examples
 and apply it to the test input.
 
+Please reason step by step and show your reasoning explicitly.
 Your response MUST follow this format:
 
 ### Reasoning
-Briefly explain the observed pattern and transformation rule.
+1. For each training example, describe what changes from input to output.
+2. Summarize the transformation rule in words.
+3. Explain how the rule applies to the test input.
 
 ### Proposed Rule
 Describe the transformation rule in concise words.
@@ -83,6 +86,9 @@ Test Input:
 REFLEXION_EVALUATOR_PROMPT = """
 You are given a proposed transformation rule for an ARC task,
 along with the original training examples.
+
+Each example consists of an input grid and its corresponding output grid.
+The grids are 2D arrays of integers, where each integer represents a color.
 
 Your task is to check whether the proposed rule correctly transforms
 ALL training inputs into their corresponding training outputs.
@@ -109,6 +115,9 @@ You previously proposed a transformation rule and solution for an ARC task,
 but the rule failed to reproduce all training outputs.
 
 Below is the original task and the evaluator's feedback.
+
+Each example consists of an input grid and its corresponding output grid.
+The grids are 2D arrays of integers, where each integer represents a color.
 
 Training Examples:
 
@@ -137,3 +146,45 @@ Output Grid:
 """
 
 
+PAL_VISIBLE_PROMPT = """
+Below are several training examples of a grid transformation task.
+
+Each example consists of an input grid and its corresponding output grid.
+The grids are 2D arrays of integers, where each integer represents a color.
+
+Training Examples:
+
+{examples}
+
+Your task is to infer the transformation rule and express it as a Python function.
+
+You MUST reason explicitly before writing any code.
+
+Your response MUST follow the exact format below.
+
+### Reasoning
+Analyze the training examples step by step.
+Describe the transformation rule in words.
+Explain how the rule can be implemented algorithmically.
+
+### Python Program
+You must now implement the rule as a Python function.
+
+Rules for the Python function:
+- Define a function named: transform(grid)
+- Input: grid (a list of lists of integers)
+- Output: a new grid (list of lists of integers)
+- Do NOT use import statements
+- Do NOT use recursion
+- Do NOT use randomness
+- Use only basic Python constructs: for-loops, if-statements, indexing, assignment
+- Do NOT print anything
+- The function MUST return the output grid
+
+Return ONLY valid Python code in the following form:
+
+```python
+def transform(grid):
+    # your code here
+    return new_grid
+"""

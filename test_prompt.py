@@ -7,7 +7,7 @@
 
 import os, json
 from openai import OpenAI
-from template import construct_prompt, parse_output, build_train_examples, grid_to_str
+from template import construct_prompt, parse_output, build_train_examples, grid_to_str, parse_reflexion_actor_output, parse_reflexion_evaluator_output
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -158,7 +158,7 @@ def main():
     # Step1: 读取jsonl文件，并分割数据
     tasks = load_jsonl("val.jsonl")
     ground_truths = [task['test'][0]['output'] for task in tasks]
-    strategies = ["reflexion"]
+    strategies = ["pal"]
     model_name = os.getenv("model_name", "your_model")  # 从环境变量获取模型名称，默认为"your_model"
     sanitized_model_name = sanitize_filename(model_name)  # 清理模型名称用于文件名
     
@@ -191,22 +191,96 @@ def main():
                 log_file.write("Ground Truth:\n")
                 log_file.write(grid_to_str(ground_truth) + "\n\n")
                 
-                # Step3: 构造prompt
-                prompt = construct_prompt(task, strategy)
-                
-                # Step4: 调用llm
-                response = speak_and_listen(prompt, model_name)
-                
-                # 记录模型的原始输出
-                log_file.write("Model Raw Output:\n")
-                log_file.write(response + "\n\n")
-                
-                # Step5: 解析模型输出
-                prediction = parse_output(response, strategy)
-                
-                # 记录parse出来的模型答案
-                log_file.write("Parsed Model Output:\n")
-                log_file.write(grid_to_str(prediction) + "\n\n")
+                # Step3: 构造prompt并调用llm
+                if strategy == "reflexion":
+                    # Reflexion strategy的特殊处理流程
+                    max_iterations = 2  # 最多修正5次
+                    proposed_rule = ""
+                    prediction = []
+                    feedback = ""
+                    
+                    for iteration in range(max_iterations):
+                        log_file.write(f"--- Reflexion Iteration {iteration + 1} ---\n\n")
+                        
+                        if iteration == 0:
+                            # 第一次：Actor提出规则和预测
+                            log_file.write("Stage: Actor\n")
+                            prompt = construct_prompt(task, strategy, reflexion_stage="actor")
+                            response = speak_and_listen(prompt, model_name)
+                            log_file.write("Actor Raw Output:\n")
+                            log_file.write(response + "\n\n")
+                            
+                            # 解析actor输出
+                            proposed_rule, prediction = parse_reflexion_actor_output(response)
+                            log_file.write(f"Proposed Rule:\n{proposed_rule}\n\n")
+                            log_file.write("Predicted Grid:\n")
+                            log_file.write(grid_to_str(prediction) + "\n\n")
+                        else:
+                            # 后续迭代：Revision修正
+                            log_file.write("Stage: Revision\n")
+                            prompt = construct_prompt(task, strategy, reflexion_stage="revision", 
+                                                     proposed_rule=proposed_rule, feedback=feedback)
+                            response = speak_and_listen(prompt, model_name)
+                            log_file.write("Revision Raw Output:\n")
+                            log_file.write(response + "\n\n")
+                            
+                            # 解析revision输出（提取新的规则和grid）
+                            new_rule, new_prediction = parse_reflexion_actor_output(response)
+                            if new_rule:
+                                proposed_rule = new_rule
+                            if new_prediction:
+                                prediction = new_prediction
+                            log_file.write(f"Revised Rule:\n{proposed_rule}\n\n")
+                            log_file.write("Revised Grid:\n")
+                            log_file.write(grid_to_str(prediction) + "\n\n")
+                        
+                        # Evaluator检查规则是否能复现所有Train Output
+                        log_file.write("Stage: Evaluator\n")
+                        evaluator_prompt = construct_prompt(task, strategy, reflexion_stage="evaluator", 
+                                                           proposed_rule=proposed_rule)
+                        evaluator_response = speak_and_listen(evaluator_prompt, model_name)
+                        log_file.write("Evaluator Raw Output:\n")
+                        log_file.write(evaluator_response + "\n\n")
+                        
+                        # 解析evaluator输出
+                        evaluation_result, feedback = parse_reflexion_evaluator_output(evaluator_response)
+                        log_file.write(f"Evaluation Result: {evaluation_result}\n")
+                        log_file.write(f"Feedback:\n{feedback}\n\n")
+                        
+                        # 如果PASS，接受答案并退出循环
+                        if evaluation_result == "PASS":
+                            log_file.write("✓ Rule PASSED evaluation. Accepting answer.\n\n")
+                            break
+                        else:
+                            log_file.write("✗ Rule FAILED evaluation. Will revise.\n\n")
+                            if iteration == max_iterations - 1:
+                                log_file.write("Maximum iterations reached. Using current prediction.\n\n")
+                    
+                    # 记录最终答案
+                    log_file.write("Final Parsed Model Output:\n")
+                    log_file.write(grid_to_str(prediction) + "\n\n")
+                    
+                else:
+                    # 其他strategy的正常处理流程
+                    prompt = construct_prompt(task, strategy)
+                    
+                    # Step4: 调用llm
+                    response = speak_and_listen(prompt, model_name)
+                    
+                    # 记录模型的原始输出
+                    log_file.write("Model Raw Output:\n")
+                    log_file.write(response + "\n\n")
+                    
+                    # Step5: 解析模型输出
+                    # 对于pal策略，需要传入test_input来执行代码
+                    if strategy == "pal":
+                        prediction = parse_output(response, strategy, test_input=test_input)
+                    else:
+                        prediction = parse_output(response, strategy)
+                    
+                    # 记录parse出来的模型答案
+                    log_file.write("Parsed Model Output:\n")
+                    log_file.write(grid_to_str(prediction) + "\n\n")
                 
                 # 判断正确与否
                 is_correct = prediction == ground_truth
