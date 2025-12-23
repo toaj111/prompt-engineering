@@ -188,3 +188,46 @@ def transform(grid):
     # your code here
     return new_grid
 """
+
+
+SELF_CONSISTENCY_PROMPT = """
+Below are several training examples of a grid transformation task.
+
+Each example consists of an input grid and its corresponding output grid.
+The grids are 2D arrays of integers, where each integer represents a color.
+
+Training Examples:
+
+{examples}
+
+Your task is to infer the transformation rule and apply it to the test input.
+
+Generate THREE independent solution attempts.
+Each attempt should include:
+- A brief description of the inferred rule
+- The final output grid
+
+Your response MUST follow this format:
+
+### Attempt 1
+Rule:
+...
+Output Grid:
+[...]
+
+### Attempt 2
+Rule:
+...
+Output Grid:
+[...]
+
+### Attempt 3
+Rule:
+...
+Output Grid:
+[...]
+
+Test Input:
+
+{test_input}
+"""

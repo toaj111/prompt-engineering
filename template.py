@@ -1,6 +1,7 @@
 import json
 import re
-from prompts import BASELINE_PROMPT, COT_PROMPT, REFLEXION_ACTOR_PROMPT, REFLEXION_EVALUATOR_PROMPT, REFLEXION_REVISION_PROMPT, PAL_VISIBLE_PROMPT
+from collections import Counter
+from prompts import BASELINE_PROMPT, COT_PROMPT, REFLEXION_ACTOR_PROMPT, REFLEXION_EVALUATOR_PROMPT, REFLEXION_REVISION_PROMPT, PAL_VISIBLE_PROMPT, SELF_CONSISTENCY_PROMPT
 
 def grid_to_str(grid: list[list[int]]) -> str:
     """
@@ -159,6 +160,133 @@ def parse_reflexion_evaluator_output(text: str) -> tuple[str, str]:
     
     return evaluation_result, explanation
 
+def parse_self_consistency_output(text: str) -> list[list[list[int]]]:
+    """
+    解析self_consistency的输出，提取所有attempt的输出网格
+    
+    参数:
+    text: self_consistency的输出文本
+    
+    返回:
+    list: 包含所有attempt的输出网格的列表
+          例如: [grid1, grid2, grid3]
+    """
+    text = text.strip()
+    attempts = []
+    
+    # 查找所有Attempt部分
+    attempt_patterns = [
+        r'###\s*Attempt\s*(\d+)',
+        r'##\s*Attempt\s*(\d+)',
+        r'#\s*Attempt\s*(\d+)',
+        r'Attempt\s*(\d+):',
+    ]
+    
+    # 找到所有attempt的位置（避免重复）
+    attempt_positions = []
+    seen_positions = set()
+    
+    for pattern in attempt_patterns:
+        matches = list(re.finditer(pattern, text, re.IGNORECASE))
+        for match in matches:
+            pos = match.start()
+            # 避免重复添加相同位置的attempt
+            if pos not in seen_positions:
+                attempt_num = int(match.group(1))
+                attempt_positions.append((attempt_num, pos))
+                seen_positions.add(pos)
+    
+    # 按位置排序
+    attempt_positions.sort(key=lambda x: x[1])
+    
+    # 提取每个attempt的输出网格
+    for i, (attempt_num, start_pos) in enumerate(attempt_positions):
+        # 确定这个attempt的结束位置（下一个attempt的开始或文本末尾）
+        if i + 1 < len(attempt_positions):
+            end_pos = attempt_positions[i + 1][1]
+        else:
+            end_pos = len(text)
+        
+        attempt_text = text[start_pos:end_pos]
+        
+        # 查找"Output Grid:"标记
+        output_grid_markers = ["Output Grid:", "Output:", "Grid:"]
+        grid_start = -1
+        for marker in output_grid_markers:
+            idx = attempt_text.find(marker)
+            if idx != -1:
+                grid_start = idx + len(marker)
+                break
+        
+        if grid_start != -1:
+            grid_text = attempt_text[grid_start:].strip()
+            # 尝试解析网格
+            grid = parse_output(grid_text, strategy="baseline")
+            if grid:
+                attempts.append(grid)
+    
+    return attempts
+
+def majority_vote_grids(grids: list[list[list[int]]]) -> list[list[int]]:
+    """
+    使用众数投票从多个网格中选择最可能的答案
+    
+    参数:
+    grids: 多个网格的列表
+    
+    返回:
+    list: 投票后的网格
+    """
+    if not grids:
+        return []
+    
+    if len(grids) == 1:
+        return grids[0]
+    
+    # 找到最大尺寸（行数和列数）
+    max_rows = max(len(grid) for grid in grids)
+    max_cols = max(max(len(row) for row in grid) if grid else 0 for grid in grids)
+    
+    # 如果尺寸不一致，需要处理
+    # 先尝试找到最常见的尺寸
+    size_counts = {}
+    for grid in grids:
+        if grid:
+            size_key = (len(grid), len(grid[0]) if grid[0] else 0)
+            size_counts[size_key] = size_counts.get(size_key, 0) + 1
+    
+    # 选择最常见的尺寸
+    if size_counts:
+        most_common_size = max(size_counts.items(), key=lambda x: x[1])[0]
+        target_rows, target_cols = most_common_size
+    else:
+        target_rows, target_cols = max_rows, max_cols
+    
+    # 创建结果网格
+    result = []
+    for i in range(target_rows):
+        row = []
+        for j in range(target_cols):
+            # 收集所有网格在(i, j)位置的值
+            values = []
+            for grid in grids:
+                if i < len(grid) and j < len(grid[i]):
+                    values.append(grid[i][j])
+            
+            # 如果没有任何值，使用0
+            if not values:
+                row.append(0)
+            else:
+                # 使用众数投票
+                counter = Counter(values)
+                # 找到出现次数最多的值
+                most_common_value, count = counter.most_common(1)[0]
+                row.append(most_common_value)
+        
+        result.append(row)
+    
+    return result
+
 def extract_python_code(text: str) -> str:
     """
     从文本中提取Python代码
@@ -235,7 +363,7 @@ def construct_prompt(d: dict, strategy: str = "baseline", reflexion_stage: str =
     d (dict): jsonl数据文件的一行，解析成字典后的变量。
               注意：传入的 'd' 已经过处理，其 'test' 字段列表
               只包含 'input'，不包含 'output' 答案。
-    strategy: 策略类型，可以是 "baseline", "cot", "reflexion", "pal"
+    strategy: 策略类型，可以是 "baseline", "cot", "reflexion", "pal", "self_consistency"
     reflexion_stage: 当strategy为"reflexion"时，指定阶段："actor", "evaluator", "revision"
     proposed_rule: 当reflexion_stage为"evaluator"或"revision"时，需要传入之前提出的规则
     feedback: 当reflexion_stage为"revision"时，需要传入evaluator的反馈
@@ -274,6 +402,9 @@ def construct_prompt(d: dict, strategy: str = "baseline", reflexion_stage: str =
         print(prompt)
     elif strategy == "pal":
         prompt = PAL_VISIBLE_PROMPT.format(examples=examples)
+        print(prompt)
+    elif strategy == "self_consistency":
+        prompt = SELF_CONSISTENCY_PROMPT.format(examples=examples, test_input=grid_to_str(d['test'][0]['input']))
         print(prompt)
     else:
         pass
@@ -533,6 +664,15 @@ def parse_output(text: str, strategy: str = "baseline", test_input: list[list[in
             # 如果执行出错，返回空列表
             print(f"Error executing PAL code: {e}")
             return []
+    elif strategy == "self_consistency":
+        # Self-consistency strategy: 解析多个attempt并使用众数投票
+        attempts = parse_self_consistency_output(text)
+        if not attempts:
+            return []
+        
+        # 使用众数投票选择最可能的答案
+        result = majority_vote_grids(attempts)
+        return result
     else:
         pass
     return []

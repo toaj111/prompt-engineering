@@ -6,6 +6,8 @@
 # 5）统计有多少完全匹配 ground truth 并计算 accuracy
 
 import os, json
+import argparse
+from datetime import datetime
 from openai import OpenAI
 from template import construct_prompt, parse_output, build_train_examples, grid_to_str, parse_reflexion_actor_output, parse_reflexion_evaluator_output
 from dotenv import load_dotenv
@@ -15,22 +17,34 @@ load_dotenv()
 def load_jsonl(path: str) -> list[dict]:
     """
     功能：
-        从给定的 jsonl 文件中读取所有样本，并返回一个列表，每个元素是一个任务字典。
-        每一行对应一个 ARC 任务（例如包含 "train" / "test" 等字段）。
+        从给定的 jsonl 或 json 文件中读取所有样本，并返回一个列表，每个元素是一个任务字典。
+        对于 jsonl 文件：每一行对应一个 ARC 任务（例如包含 "train" / "test" 等字段）。
+        对于 json 文件：应该是一个包含任务列表的 JSON 数组。
 
     输入参数：
-        path: 字符串形式的文件路径，例如 "val.jsonl"。
+        path: 字符串形式的文件路径，例如 "val.jsonl" 或 "val_hard.json"。
 
     返回值：
         data: 列表（list），其中每个元素是一个字典（dict），表示一个 ARC 任务。
               例如 data[i] = d_i，其中 d_i 可以直接传给 construct_prompt(d_i) 使用。
     """
     data = []
-    with open(path, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if line:  # 跳过空行
-                data.append(json.loads(line))
+    if path.endswith('.json'):
+        # 处理 JSON 文件（可能是数组格式）
+        with open(path, 'r', encoding='utf-8') as f:
+            content = json.load(f)
+            if isinstance(content, list):
+                data = content
+            else:
+                # 如果不是列表，尝试作为单个对象处理
+                data = [content]
+    else:
+        # 处理 JSONL 文件（每行一个 JSON 对象）
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line:  # 跳过空行
+                    data.append(json.loads(line))
     return data
 
 
@@ -152,15 +166,37 @@ def main():
         串联整个评测流程，形成完整的 pipeline。
         主要步骤示意（具体实现由你在填代码时决定）：
     """
-    # TODO： 根据不同的任务类型，读取不同的jsonl文件。
-    # TODO： 根据用户要求选择不同的prompt进行评测。
-    # TODO： 根据用户要求选择不同的llm进行评测。
+    # 解析命令行参数
+    parser = argparse.ArgumentParser(description='Run ARC task evaluation')
+    parser.add_argument('--version', type=str, default=None, help='Version name for this test run (default: timestamp)')
+    parser.add_argument('--dataset', type=str, default='val.jsonl', choices=['val.jsonl', 'val_hard.json'], 
+                       help='Dataset to use (default: val.jsonl)')
+    args = parser.parse_args()
+    
+    # 确定version
+    if args.version:
+        version = args.version
+    else:
+        # 使用时间戳作为version
+        version = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # 确定数据集
+    dataset_path = args.dataset
+    dataset_name = dataset_path.replace('.jsonl', '').replace('.json', '')  # 提取数据集名称（不含扩展名）
+    
     # Step1: 读取jsonl文件，并分割数据
-    tasks = load_jsonl("val.jsonl")
+    tasks = load_jsonl(dataset_path)
     ground_truths = [task['test'][0]['output'] for task in tasks]
-    strategies = ["pal"]
+    strategies = ["self_consistency"]
     model_name = os.getenv("model_name", "your_model")  # 从环境变量获取模型名称，默认为"your_model"
     sanitized_model_name = sanitize_filename(model_name)  # 清理模型名称用于文件名
+    
+    # 创建log文件夹
+    sanitized_version = sanitize_filename(version)
+    sanitized_dataset = sanitize_filename(dataset_name)
+    log_dir = f"{sanitized_model_name}_{sanitized_version}_{sanitized_dataset}"
+    os.makedirs(log_dir, exist_ok=True)
+    print(f"Log directory created: {log_dir}")
     
     # 存储所有strategy的结果，用于生成汇总log
     all_strategy_results = {}  # {strategy: {task_id: success}}
@@ -169,10 +205,12 @@ def main():
     for strategy in strategies:
         strategy_results = {}  # {task_id: success}
         sanitized_strategy = sanitize_filename(strategy)
-        log_filename = f"{sanitized_model_name}_{sanitized_strategy}.log"
+        log_filename = os.path.join(log_dir, f"{sanitized_model_name}_{sanitized_strategy}.log")
         
         with open(log_filename, 'w', encoding='utf-8') as log_file:
             log_file.write(f"Model: {model_name}\n")
+            log_file.write(f"Version: {version}\n")
+            log_file.write(f"Dataset: {dataset_path}\n")
             log_file.write(f"Strategy: {strategy}\n")
             log_file.write("=" * 80 + "\n\n")
             
@@ -324,9 +362,11 @@ def main():
         print(f"Strategy '{strategy}' completed. Accuracy: {accuracy:.2%}. Log saved to {log_filename}")
     
     # 生成汇总log文件
-    summary_filename = f"{sanitized_model_name}_summary.log"
+    summary_filename = os.path.join(log_dir, f"{sanitized_model_name}_summary.log")
     with open(summary_filename, 'w', encoding='utf-8') as summary_file:
         summary_file.write(f"Model: {model_name}\n")
+        summary_file.write(f"Version: {version}\n")
+        summary_file.write(f"Dataset: {dataset_path}\n")
         summary_file.write("Strategy Comparison Summary\n")
         summary_file.write("=" * 80 + "\n\n")
         
