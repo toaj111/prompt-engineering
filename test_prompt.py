@@ -187,7 +187,7 @@ def main():
     # Step1: 读取jsonl文件，并分割数据
     tasks = load_jsonl(dataset_path)
     ground_truths = [task['test'][0]['output'] for task in tasks]
-    strategies = ["self_consistency"]
+    strategies = ["baseline", "cot", "reflexion", "pal", "self_consistency"]
     model_name = os.getenv("model_name", "your_model")  # 从环境变量获取模型名称，默认为"your_model"
     sanitized_model_name = sanitize_filename(model_name)  # 清理模型名称用于文件名
     
