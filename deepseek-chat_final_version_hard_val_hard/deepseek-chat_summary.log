@@ -1,0 +1,158 @@
+Model: deepseek-chat
+Version: final_version_hard
+Dataset: val_hard.jsonl
+Strategy Comparison Summary
+================================================================================
+
+Task ID   baseline       cot            reflexion      pal            self_consistency
+-------------------------------------------------------------------------------------
+1         Failed         Failed         Failed         Failed         Failed         
+2         Failed         Failed         Failed         Failed         Failed         
+3         Failed         Failed         Failed         Failed         Failed         
+4         Failed         Failed         Failed         Failed         Failed         
+5         Failed         Failed         Failed         Failed         Failed         
+6         Failed         Failed         Failed         Failed         Failed         
+7         Failed         Failed         Failed         Failed         Failed         
+8         Failed         Failed         Failed         Failed         Failed         
+9         Failed         Failed         Failed         Failed         Failed         
+10        Failed         Failed         Failed         Failed         Failed         
+11        Failed         Failed         Failed         Failed         Failed         
+12        Failed         Failed         Failed         Failed         Failed         
+13        Failed         Failed         Failed         Failed         Failed         
+14        Failed         Failed         Failed         Failed         Failed         
+15        Failed         Failed         Failed         Failed         Failed         
+16        Failed         Failed         Failed         Failed         Failed         
+17        Failed         Failed         Failed         Failed         Failed         
+18        Failed         Failed         Failed         Failed         Failed         
+19        Failed         Failed         Failed         Failed         Failed         
+20        Failed         Failed         Failed         Failed         Failed         
+21        Failed         Failed         Failed         Failed         Failed         
+22        Failed         Failed         Failed         Failed         Failed         
+23        Failed         Failed         Failed         Failed         Failed         
+24        Failed         Failed         Failed         Failed         Failed         
+25        Failed         Success        Failed         Success        Failed         
+26        Failed         Failed         Failed         Failed         Failed         
+27        Failed         Failed         Failed         Failed         Failed         
+28        Failed         Failed         Failed         Success        Failed         
+29        Failed         Failed         Failed         Failed         Failed         
+30        Failed         Failed         Failed         Failed         Failed         
+31        Failed         Failed         Failed         Failed         Failed         
+32        Failed         Failed         Failed         Failed         Failed         
+33        Failed         Failed         Failed         Failed         Failed         
+34        Failed         Failed         Failed         Failed         Failed         
+35        Failed         Failed         Failed         Failed         Failed         
+36        Failed         Failed         Failed         Failed         Failed         
+37        Failed         Success        Failed         Failed         Failed         
+38        Failed         Failed         Failed         Failed         Failed         
+39        Failed         Failed         Failed         Failed         Failed         
+40        Failed         Failed         Failed         Failed         Failed         
+41        Failed         Failed         Failed         Failed         Failed         
+42        Failed         Failed         Failed         Failed         Failed         
+43        Failed         Failed         Failed         Failed         Failed         
+44        Failed         Failed         Failed         Failed         Failed         
+45        Failed         Failed         Failed         Failed         Failed         
+46        Failed         Failed         Failed         Failed         Failed         
+47        Failed         Failed         Failed         Failed         Failed         
+48        Failed         Failed         Failed         Failed         Failed         
+49        Failed         Failed         Failed         Failed         Failed         
+50        Failed         Failed         Failed         Failed         Failed         
+51        Failed         Failed         Failed         Failed         Failed         
+52        Failed         Failed         Failed         Failed         Failed         
+53        Failed         Failed         Failed         Failed         Failed         
+54        Failed         Failed         Failed         Failed         Failed         
+55        Failed         Failed         Failed         Failed         Failed         
+56        Failed         Failed         Failed         Failed         Failed         
+57        Failed         Failed         Failed         Failed         Failed         
+58        Failed         Failed         Failed         Failed         Failed         
+59        Failed         Failed         Failed         Failed         Failed         
+60        Failed         Failed         Failed         Failed         Failed         
+61        Failed         Failed         Failed         Failed         Failed         
+62        Failed         Failed         Failed         Failed         Failed         
+63        Failed         Failed         Failed         Failed         Failed         
+64        Failed         Failed         Failed         Failed         Failed         
+65        Failed         Failed         Failed         Failed         Failed         
+66        Failed         Failed         Failed         Failed         Failed         
+67        Failed         Failed         Failed         Failed         Failed         
+68        Failed         Failed         Failed         Failed         Failed         
+69        Failed         Failed         Failed         Failed         Failed         
+70        Failed         Failed         Failed         Failed         Failed         
+71        Failed         Failed         Failed         Failed         Failed         
+72        Failed         Failed         Failed         Failed         Failed         
+73        Failed         Failed         Failed         Failed         Failed         
+74        Failed         Failed         Failed         Failed         Failed         
+75        Failed         Failed         Failed         Failed         Failed         
+76        Failed         Failed         Failed         Failed         Failed         
+77        Failed         Failed         Failed         Failed         Failed         
+78        Failed         Failed         Failed         Failed         Failed         
+79        Failed         Failed         Failed         Failed         Failed         
+80        Failed         Failed         Failed         Failed         Failed         
+81        Failed         Failed         Failed         Failed         Failed         
+82        Failed         Failed         Failed         Failed         Failed         
+83        Failed         Failed         Failed         Failed         Failed         
+84        Failed         Failed         Failed         Failed         Failed         
+85        Failed         Failed         Failed         Success        Failed         
+86        Failed         Failed         Failed         Failed         Failed         
+87        Failed         Failed         Failed         Failed         Failed         
+88        Failed         Failed         Failed         Failed         Failed         
+89        Failed         Failed         Failed         Failed         Failed         
+90        Failed         Failed         Failed         Failed         Failed         
+91        Failed         Failed         Failed         Failed         Failed         
+92        Failed         Failed         Failed         Failed         Failed         
+93        Failed         Failed         Failed         Failed         Failed         
+94        Failed         Failed         Failed         Failed         Failed         
+95        Failed         Failed         Failed         Failed         Failed         
+96        Failed         Failed         Failed         Failed         Failed         
+97        Failed         Failed         Failed         Failed         Failed         
+98        Failed         Failed         Failed         Failed         Failed         
+99        Failed         Failed         Failed         Failed         Failed         
+100       Failed         Failed         Failed         Failed         Failed         
+101       Failed         Failed         Failed         Failed         Failed         
+102       Failed         Failed         Failed         Failed         Failed         
+103       Failed         Failed         Failed         Failed         Failed         
+104       Failed         Failed         Failed         Failed         Failed         
+105       Failed         Failed         Failed         Failed         Failed         
+106       Failed         Failed         Failed         Failed         Failed         
+107       Failed         Failed         Failed         Success        Failed         
+108       Failed         Failed         Failed         Success        Failed         
+109       Failed         Failed         Failed         Failed         Failed         
+110       Failed         Failed         Failed         Failed         Failed         
+111       Failed         Failed         Failed         Failed         Failed         
+112       Failed         Failed         Failed         Failed         Failed         
+113       Failed         Failed         Failed         Failed         Failed         
+114       Failed         Failed         Failed         Failed         Failed         
+115       Failed         Failed         Failed         Failed         Failed         
+116       Failed         Failed         Failed         Failed         Failed         
+117       Failed         Failed         Failed         Failed         Failed         
+118       Failed         Failed         Failed         Failed         Failed         
+119       Failed         Failed         Failed         Failed         Failed         
+120       Failed         Failed         Success        Failed         Failed         
+121       Failed         Failed         Failed         Success        Failed         
+122       Success        Failed         Failed         Failed         Success        
+123       Failed         Failed         Failed         Failed         Failed         
+124       Failed         Failed         Failed         Failed         Failed         
+125       Failed         Success        Failed         Success        Success        
+126       Failed         Failed         Failed         Failed         Failed         
+127       Failed         Success        Failed         Success        Failed         
+128       Failed         Failed         Failed         Failed         Failed         
+129       Success        Success        Success        Success        Success        
+130       Failed         Failed         Failed         Failed         Failed         
+131       Success        Success        Success        Success        Success        
+132       Failed         Failed         Failed         Success        Failed         
+133       Failed         Failed         Failed         Success        Failed         
+134       Failed         Success        Failed         Success        Failed         
+135       Failed         Success        Failed         Success        Success        
+136       Failed         Failed         Failed         Failed         Failed         
+137       Failed         Failed         Failed         Failed         Failed         
+138       Failed         Failed         Failed         Failed         Failed         
+139       Failed         Failed         Failed         Failed         Failed         
+140       Failed         Failed         Failed         Failed         Failed         
+141       Failed         Success        Failed         Success        Failed         
+-------------------------------------------------------------------------------------
+
+Strategy Accuracy:
+--------------------------------------------------------------------------------
+baseline: 2.13% (3/141)
+cot: 6.38% (9/141)
+reflexion: 2.13% (3/141)
+pal: 10.64% (15/141)
+self_consistency: 3.55% (5/141)

@@ -1,0 +1,47 @@
+Model: deepseek-chat
+Version: final_version
+Dataset: val.jsonl
+Strategy Comparison Summary
+================================================================================
+
+Task ID   baseline       cot            reflexion      pal            self_consistency
+-------------------------------------------------------------------------------------
+1         Failed         Success        Failed         Success        Failed         
+2         Success        Success        Failed         Success        Success        
+3         Success        Failed         Success        Success        Success        
+4         Failed         Success        Failed         Success        Success        
+5         Success        Success        Success        Success        Success        
+6         Failed         Success        Failed         Failed         Failed         
+7         Failed         Success        Success        Success        Failed         
+8         Failed         Success        Failed         Success        Success        
+9         Success        Success        Failed         Success        Success        
+10        Failed         Failed         Failed         Failed         Failed         
+11        Failed         Success        Failed         Success        Success        
+12        Failed         Success        Failed         Success        Failed         
+13        Success        Success        Failed         Success        Failed         
+14        Success        Success        Success        Success        Success        
+15        Success        Success        Success        Success        Success        
+16        Success        Success        Success        Success        Success        
+17        Failed         Failed         Failed         Success        Failed         
+18        Failed         Success        Failed         Success        Failed         
+19        Success        Success        Success        Success        Failed         
+20        Failed         Success        Failed         Success        Failed         
+21        Failed         Failed         Failed         Failed         Failed         
+22        Failed         Failed         Failed         Failed         Failed         
+23        Failed         Failed         Failed         Failed         Failed         
+24        Failed         Failed         Failed         Failed         Failed         
+25        Failed         Failed         Failed         Failed         Failed         
+26        Failed         Success        Failed         Failed         Failed         
+27        Failed         Failed         Success        Failed         Failed         
+28        Success        Failed         Success        Failed         Success        
+29        Failed         Failed         Failed         Failed         Failed         
+30        Failed         Failed         Failed         Failed         Failed         
+-------------------------------------------------------------------------------------
+
+Strategy Accuracy:
+--------------------------------------------------------------------------------
+baseline: 33.33% (10/30)
+cot: 60.00% (18/30)
+reflexion: 30.00% (9/30)
+pal: 60.00% (18/30)
+self_consistency: 36.67% (11/30)

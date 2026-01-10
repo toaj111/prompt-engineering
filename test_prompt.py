@@ -7,6 +7,7 @@
 
 import os, json
 import argparse
+import re
 from datetime import datetime
 from openai import OpenAI
 from template import construct_prompt, parse_output, build_train_examples, grid_to_str, parse_reflexion_actor_output, parse_reflexion_evaluator_output
@@ -89,6 +90,88 @@ def sanitize_filename(name: str) -> str:
         sanitized = sanitized.replace(char, '_')
     return sanitized
 
+def is_strategy_completed(log_filename: str) -> bool:
+    """
+    检查strategy是否已完成
+    
+    参数:
+    log_filename: log文件路径
+    
+    返回:
+    bool: 如果strategy已完成返回True，否则返回False
+    """
+    if not os.path.exists(log_filename):
+        return False
+    
+    try:
+        with open(log_filename, 'r', encoding='utf-8') as f:
+            content = f.read()
+            # 检查是否包含SUMMARY部分和完整的统计信息
+            if "SUMMARY" in content and "Total Tasks:" in content and "Accuracy:" in content:
+                # 进一步检查是否有完整的任务结果表格
+                if "Task Results Table:" in content and "Successful Tasks:" in content:
+                    return True
+        return False
+    except Exception:
+        return False
+
+def load_strategy_results_from_log(log_filename: str, total_tasks: int) -> dict:
+    """
+    从已完成的log文件中读取strategy结果
+    
+    参数:
+    log_filename: log文件路径
+    total_tasks: 总任务数
+    
+    返回:
+    dict: {task_id: success} 格式的结果字典
+    """
+    strategy_results = {}
+    
+    try:
+        with open(log_filename, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+            # 查找Task Results Table部分
+            table_start = content.find("Task Results Table:")
+            if table_start == -1:
+                return strategy_results
+            
+            # 提取表格内容
+            table_end = content.find("Successful Tasks:", table_start)
+            if table_end == -1:
+                return strategy_results
+            
+            table_content = content[table_start:table_end]
+            
+            # 解析每一行的任务结果
+            lines = table_content.split('\n')
+            for line in lines:
+                line = line.strip()
+                if not line or line.startswith('-') or 'Task ID' in line or 'Status' in line:
+                    continue
+                
+                # 解析格式: "1          Success" 或 "1          Failed"
+                parts = line.split()
+                if len(parts) >= 2:
+                    try:
+                        task_id = int(parts[0])
+                        status = parts[1]
+                        strategy_results[task_id] = (status == "Success")
+                    except (ValueError, IndexError):
+                        continue
+        
+        # 验证结果完整性
+        if len(strategy_results) == total_tasks:
+            return strategy_results
+        else:
+            # 如果结果不完整，返回空字典
+            return {}
+            
+    except Exception as e:
+        print(f"Error loading results from {log_filename}: {e}")
+        return {}
+
 def speak_and_listen(messages: list[dict], model_name: str, temperature: float = 0.0) -> str:
     """
     功能：
@@ -127,7 +210,8 @@ def speak_and_listen(messages: list[dict], model_name: str, temperature: float =
         response = client.chat.completions.create(
             model=model_name,
             messages=messages,
-            temperature=temperature
+            temperature=temperature,
+            max_tokens=8000
         )
         
         # 检查响应是否有效
@@ -169,7 +253,7 @@ def main():
     # 解析命令行参数
     parser = argparse.ArgumentParser(description='Run ARC task evaluation')
     parser.add_argument('--version', type=str, default=None, help='Version name for this test run (default: timestamp)')
-    parser.add_argument('--dataset', type=str, default='val.jsonl', choices=['val.jsonl', 'val_hard.json'], 
+    parser.add_argument('--dataset', type=str, default='val.jsonl', choices=['val.jsonl', 'val_hard.jsonl'], 
                        help='Dataset to use (default: val.jsonl)')
     args = parser.parse_args()
     
@@ -196,26 +280,126 @@ def main():
     sanitized_dataset = sanitize_filename(dataset_name)
     log_dir = f"{sanitized_model_name}_{sanitized_version}_{sanitized_dataset}"
     os.makedirs(log_dir, exist_ok=True)
-    print(f"Log directory created: {log_dir}")
+    
+    # 检查log文件夹是否已存在（断点续传）
+    log_dir_exists = os.path.exists(log_dir) and os.path.isdir(log_dir)
+    if log_dir_exists:
+        print(f"Log directory already exists: {log_dir}")
+        print("Checking for completed strategies...")
+    else:
+        print(f"Log directory created: {log_dir}")
     
     # 存储所有strategy的结果，用于生成汇总log
     all_strategy_results = {}  # {strategy: {task_id: success}}
+    total_tasks = len(tasks)
     
-    # Step2: 循环处理每个strategy
+    # 检查哪些strategy已完成
+    completed_strategies = []
+    pending_strategies = []
+    
     for strategy in strategies:
+        sanitized_strategy = sanitize_filename(strategy)
+        log_filename = os.path.join(log_dir, f"{sanitized_model_name}_{sanitized_strategy}.log")
+        
+        if is_strategy_completed(log_filename):
+            print(f"Strategy '{strategy}' is already completed. Loading results from log...")
+            strategy_results = load_strategy_results_from_log(log_filename, total_tasks)
+            if strategy_results:
+                all_strategy_results[strategy] = strategy_results
+                completed_strategies.append(strategy)
+                # 计算准确率
+                correct_count = sum(strategy_results.values())
+                accuracy = correct_count / total_tasks if total_tasks > 0 else 0.0
+                print(f"  Loaded {len(strategy_results)} results. Accuracy: {accuracy:.2%}")
+            else:
+                print(f"  Warning: Could not load results from log. Will re-run strategy '{strategy}'.")
+                pending_strategies.append(strategy)
+        else:
+            pending_strategies.append(strategy)
+    
+    if completed_strategies:
+        print(f"\nCompleted strategies: {completed_strategies}")
+    if pending_strategies:
+        print(f"Pending strategies: {pending_strategies}\n")
+    else:
+        print("\nAll strategies are already completed!\n")
+    
+    # Step2: 循环处理每个未完成的strategy
+    for strategy in pending_strategies:
         strategy_results = {}  # {task_id: success}
         sanitized_strategy = sanitize_filename(strategy)
         log_filename = os.path.join(log_dir, f"{sanitized_model_name}_{sanitized_strategy}.log")
         
-        with open(log_filename, 'w', encoding='utf-8') as log_file:
-            log_file.write(f"Model: {model_name}\n")
-            log_file.write(f"Version: {version}\n")
-            log_file.write(f"Dataset: {dataset_path}\n")
-            log_file.write(f"Strategy: {strategy}\n")
-            log_file.write("=" * 80 + "\n\n")
+        # 检查log文件是否存在（可能是之前中断的）
+        log_exists = os.path.exists(log_filename)
+        start_task_id = 1
+        
+        if log_exists and not is_strategy_completed(log_filename):
+            # 文件存在但不完整，找到最后一个完成的任务
+            try:
+                with open(log_filename, 'r', encoding='utf-8') as f:
+                    existing_content = f.read()
+                    # 查找最后一个"Task X"的位置
+                    last_task_match = None
+                    for match in re.finditer(r'Task (\d+)\n', existing_content):
+                        last_task_match = match
+                    if last_task_match:
+                        last_task_id = int(last_task_match.group(1))
+                        # 检查这个任务是否完整（有"Correct:"标记）
+                        task_end = existing_content.find("Task ", last_task_match.end())
+                        if task_end == -1:
+                            task_end = len(existing_content)
+                        task_content = existing_content[last_task_match.start():task_end]
+                        if "Correct:" in task_content:
+                            # 最后一个任务已完成，从下一个任务开始
+                            start_task_id = last_task_id + 1
+                            print(f"Strategy '{strategy}': Resuming from task {start_task_id}")
+                            # 读取已完成任务的结果
+                            for tid in range(1, start_task_id):
+                                # 从log中提取已完成任务的结果
+                                task_pattern = rf'Task {tid}\n.*?Correct:.*?([✓✗])\s*(Yes|No)'
+                                match = re.search(task_pattern, existing_content, re.DOTALL)
+                                if match:
+                                    is_correct = match.group(1) == '✓' or match.group(2) == 'Yes'
+                                    strategy_results[tid] = is_correct
+                        else:
+                            # 最后一个任务未完成，从它开始
+                            start_task_id = last_task_id
+                            print(f"Strategy '{strategy}': Resuming from incomplete task {start_task_id}")
+                            # 读取已完成任务的结果
+                            for tid in range(1, start_task_id):
+                                task_pattern = rf'Task {tid}\n.*?Correct:.*?([✓✗])\s*(Yes|No)'
+                                match = re.search(task_pattern, existing_content, re.DOTALL)
+                                if match:
+                                    is_correct = match.group(1) == '✓' or match.group(2) == 'Yes'
+                                    strategy_results[tid] = is_correct
+            except Exception as e:
+                print(f"Warning: Could not parse existing log file for strategy '{strategy}': {e}")
+                print("Starting from the beginning...")
+                start_task_id = 1
+        
+        # 打开文件（追加模式如果已存在且不完整，否则新建）
+        file_mode = 'a' if (log_exists and start_task_id > 1) else 'w'
+        
+        with open(log_filename, file_mode, encoding='utf-8') as log_file:
+            if file_mode == 'w':
+                # 新文件，写入头部信息
+                log_file.write(f"Model: {model_name}\n")
+                log_file.write(f"Version: {version}\n")
+                log_file.write(f"Dataset: {dataset_path}\n")
+                log_file.write(f"Strategy: {strategy}\n")
+                log_file.write("=" * 80 + "\n\n")
+            elif file_mode == 'a' and start_task_id > 1:
+                # 追加模式，添加分隔符
+                log_file.write("\n" + "=" * 80 + "\n")
+                log_file.write("RESUMING FROM PREVIOUS RUN\n")
+                log_file.write("=" * 80 + "\n\n")
             
-            # 循环处理每个任务
+            # 循环处理每个任务（从start_task_id开始）
             for task_id, task in enumerate(tasks, 1):
+                if task_id < start_task_id:
+                    # 跳过已完成的任务（结果已从log中读取）
+                    continue
                 log_file.write(f"Task {task_id}\n")
                 log_file.write("-" * 80 + "\n")
                 
